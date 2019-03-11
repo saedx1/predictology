@@ -26,7 +26,7 @@ def getFilesLists():
 def is_encoded(encoding, start, end, word):
     encodings = []
     for key, val in encoding:
-        if val['start'] <= start and val['end'] >= end:
+        if val['start'] <= start and val['end'] >= end and word in val['text']:
             encodings.append((val['code'], start != val['start'] or end != val['end']))
     if len(encodings) == 0:        
         return ('O', False)
@@ -56,13 +56,17 @@ def processFile(xmlroot, fname):
             encoding[idx]['as'] = child.text
             break
     for tag in xmlroot.iter('annotation'):
+        start = end = None
         for child in tag:
             if child.tag == 'mention':
                 idx = child.get('id')
             elif child.tag == 'spannedText':
                 text = child.text
             elif child.tag == 'span':
-                start, end = (int(child.get('start')), int(child.get('end')))
+                if start is None:
+                    start, end = (int(child.get('start')), int(child.get('end')))
+                else:
+                    start, end = (min(start, int(child.get('start'))), max(end, int(child.get('end'))))
 
         encoding[idx]['text'] = text
         encoding[idx]['start'] = start
@@ -77,7 +81,7 @@ def processFile(xmlroot, fname):
     temp = []
     for i in encoding:
         text = i['text']
-        i.pop('text')
+#         i.pop('text')
         temp.append((text,i))
     encoding = temp[:]
 
@@ -106,11 +110,15 @@ def processFile(xmlroot, fname):
             if tmp_more:
                 more += 1
 #                 temp.append((word, 'O', pos))
-                temp.append((word, str(more) + '_' + enc, pos))
+                if more == 1:
+                    temp.append((word, 'B-' + enc, pos))
+                else:
+                    temp.append((word, 'I-' + enc, pos))
+
 #                 temp.append((word, enc, pos))
             else:
                 more = 0
-                temp.append((word, enc, pos))
+                temp.append((word, ('' if enc == 'O' else 'B-') + enc, pos))
 
             word_before = word_end - sent_start
 
